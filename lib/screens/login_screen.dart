@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/api_service.dart';
 import '../data/app_state.dart';
 import '../theme.dart';
 import 'home_shell.dart';
@@ -17,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscure = true;
+  bool _busy = false; // กำลังรอเซิร์ฟเวอร์
 
   @override
   void dispose() {
@@ -25,17 +27,27 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
-    final ok = AppState.instance.login(_userCtrl.text, _passCtrl.text);
-    if (!ok) {
+  Future<void> _login() async {
+    if (_userCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณากรอกอีเมล/ชื่อผู้ใช้ และรหัสผ่าน')),
       );
       return;
     }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeShell()),
-    );
+    setState(() => _busy = true);
+    try {
+      await AppState.instance.login(_userCtrl.text, _passCtrl.text);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -104,12 +116,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 22),
                   ElevatedButton(
-                    onPressed: _login,
-                    child: const Text('เข้าสู่ระบบ'),
+                    onPressed: _busy ? null : _login,
+                    child: _busy
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('เข้าสู่ระบบ'),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'ทดลอง: ชื่อผู้ใช้ขึ้นต้นด้วย "admin" = แอดมิน · อื่น ๆ = นักศึกษา',
+                    'ทดลอง: admin / 1234 (แอดมิน) · somchai / 1234 (นักศึกษา)',
                     textAlign: TextAlign.center,
                     style: text.bodySmall?.copyWith(color: Colors.grey),
                   ),

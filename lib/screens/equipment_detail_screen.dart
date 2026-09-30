@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/api_service.dart';
 import '../data/app_state.dart';
 import '../models/equipment.dart';
 import '../theme.dart';
@@ -96,16 +97,22 @@ class EquipmentDetailScreen extends StatelessWidget {
     );
     if (result == null || !context.mounted) return;
 
-    final ok = AppState.instance.borrow(item, result.quantity, result.dueDate);
+    try {
+      await AppState.instance.borrow(item, result.quantity, result.dueDate);
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    }
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? 'ยืม ${item.name} x${result.quantity} สำเร็จ · คืน ${thaiShortDate(result.dueDate)}'
-            : 'ยืมไม่สำเร็จ'),
+        content: Text(
+            'ยืม ${item.name} x${result.quantity} สำเร็จ · คืน ${thaiShortDate(result.dueDate)}'),
       ),
     );
-    if (ok) Navigator.of(context).pop(); // กลับหน้ารายการ
+    Navigator.of(context).pop(); // กลับหน้ารายการ
   }
 }
 

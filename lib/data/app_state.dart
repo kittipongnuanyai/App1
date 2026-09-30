@@ -3,16 +3,23 @@ import 'package:flutter/foundation.dart';
 import '../models/borrow.dart';
 import '../models/equipment.dart';
 import '../models/user.dart';
-import 'mock_data.dart';
+import 'api_service.dart';
 
-/// สถานะรวมของแอป (เก็บในหน่วยความจำ) — ในคาบถัดไปจะเปลี่ยนไปเรียก API/MySQL แทน
+/// สถานะรวมของแอป — เฟส 2: ข้อมูลทุกอย่างมาจาก API/MySQL ผ่าน [ApiService]
+/// หน้าจอยังเรียกเมธอดชื่อเดิม แต่ตอนนี้เป็น Future (ต้อง await)
 class AppState extends ChangeNotifier {
   AppState._();
   static final AppState instance = AppState._();
 
+  /// ตัวคุยกับเซิร์ฟเวอร์ — เปลี่ยนเป็นตัวปลอมได้ตอนทดสอบ
+  ApiService api = ApiService();
+
   AppUser? _currentUser;
-  final List<Equipment> _equipment = MockData.equipment();
-  final List<Borrow> _borrows = MockData.borrows();
+  List<Equipment> _equipment = [];
+  List<Borrow> _borrows = [];
+
+  bool isLoading = false;
+  String? error;
 
   AppUser? get currentUser => _currentUser;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
@@ -28,20 +35,50 @@ class AppState extends ChangeNotifier {
         ..sort((a, b) => b.returnDate!.compareTo(a.returnDate!));
 
   // ---------- Auth ----------
-  /// จำลองการเข้าสู่ระบบ: ถ้าชื่อผู้ใช้ขึ้นต้นด้วย "admin" จะได้บทบาทแอดมิน
-  bool login(String username, String password) {
-    if (username.trim().isEmpty || password.isEmpty) return false;
-    _currentUser =
-        username.trim().toLowerCase().startsWith('admin')
-            ? MockData.admin
-            : MockData.student;
+  /// เข้าสู่ระบบผ่าน API แล้วโหลดข้อมูลทั้งหมด (โยน ApiException ถ้าไม่สำเร็จ)
+  Future<void> login(String username, String password) async {
+    _currentUser = await api.login(username.trim(), password);
     notifyListeners();
-    return true;
+    await refresh();
+  }
+
+  Future<void> register({
+    required String username,
+    required String password,
+    required String name,
+    required String studentId,
+  }) async {
+    await api.register(
+      username: username.trim(),
+      password: password,
+      name: name.trim(),
+      studentId: studentId.trim(),
+    );
   }
 
   void logout() {
     _currentUser = null;
+    _equipment = [];
+    _borrows = [];
     notifyListeners();
+  }
+
+  // ---------- โหลดข้อมูลจากเซิร์ฟเวอร์ ----------
+  /// ดึงอุปกรณ์ + รายการยืมของผู้ใช้ปัจจุบันใหม่ทั้งหมด (ใช้หลังทุกการเปลี่ยนแปลง)
+  Future<void> refresh() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      _equipment = await api.getItems();
+      final user = _currentUser;
+      _borrows = user == null ? [] : await api.getBorrows(user.id);
+    } on ApiException catch (e) {
+      error = e.message;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
   }
 
   // ---------- Equipment ----------
@@ -52,42 +89,31 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  void addEquipment(Equipment item) {
-    _equipment.add(item);
-    notifyListeners();
+  Future<void> addEquipment(Equipment item) async {
+    await api.createItem(item);
+    await refresh();
   }
 
-  void updateEquipment(Equipment item) {
-    final i = _equipment.indexWhere((e) => e.id == item.id);
-    if (i != -1) _equipment[i] = item;
-    notifyListeners();
+  Future<void> updateEquipment(Equipment item) async {
+    await api.updateItem(item);
+    await refresh();
   }
 
   // ---------- Borrow / Return ----------
-  bool borrow(Equipment item, int quantity, DateTime dueDate) {
-    if (quantity <= 0 || quantity > item.available) return false;
-    item.available -= quantity;
-    _borrows.add(
-      Borrow(
-        id: 'b${DateTime.now().millisecondsSinceEpoch}',
-        equipmentId: item.id,
-        equipmentName: item.name,
-        quantity: quantity,
-        borrowDate: DateTime.now(),
-        dueDate: dueDate,
-      ),
+  Future<void> borrow(Equipment item, int quantity, DateTime dueDate) async {
+    final user = _currentUser;
+    if (user == null) throw ApiException('กรุณาเข้าสู่ระบบก่อน');
+    await api.borrow(
+      userId: user.id,
+      itemId: item.id,
+      quantity: quantity,
+      dueDate: dueDate,
     );
-    notifyListeners();
-    return true;
+    await refresh();
   }
 
-  void returnItem(Borrow b) {
-    if (b.isReturned) return;
-    b.returnDate = DateTime.now();
-    final item = findEquipment(b.equipmentId);
-    if (item != null) {
-      item.available = (item.available + b.quantity).clamp(0, item.total);
-    }
-    notifyListeners();
+  Future<void> returnItem(Borrow b) async {
+    await api.returnItem(b.id);
+    await refresh();
   }
 }

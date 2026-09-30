@@ -40,6 +40,11 @@ class _EquipmentListScreenState extends State<EquipmentListScreen> {
             title: const Text('LabStock'),
             actions: [
               IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'โหลดใหม่',
+                onPressed: state.isLoading ? null : state.refresh,
+              ),
+              IconButton(
                 icon: const Icon(Icons.notifications_outlined),
                 tooltip: 'แจ้งเตือน',
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
@@ -81,20 +86,11 @@ class _EquipmentListScreenState extends State<EquipmentListScreen> {
               const SizedBox(height: 8),
               // ---------- ส่วนกลาง: รายการ ----------
               Expanded(
-                child: items.isEmpty
-                    ? const Center(child: Text('ไม่พบอุปกรณ์ที่ค้นหา'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 220,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.82,
-                        ),
-                        itemCount: items.length,
-                        itemBuilder: (_, i) => _EquipmentCard(item: items[i]),
-                      ),
+                // ดึงลงเพื่อโหลดใหม่จากเซิร์ฟเวอร์
+                child: RefreshIndicator(
+                  onRefresh: state.refresh,
+                  child: _buildGrid(state, items),
+                ),
               ),
             ],
           ),
@@ -111,6 +107,43 @@ class _EquipmentListScreenState extends State<EquipmentListScreen> {
               : null,
         );
       },
+    );
+  }
+
+  /// เลือกว่าจะแสดงอะไร: กำลังโหลด / ผิดพลาด / ไม่พบ / กริดปกติ
+  Widget _buildGrid(AppState state, List<Equipment> items) {
+    if (state.isLoading && state.equipment.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state.error != null && state.equipment.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.all(32),
+        children: [
+          Icon(Icons.cloud_off, size: 56, color: Colors.grey[400]),
+          const SizedBox(height: 12),
+          Text(state.error!, textAlign: TextAlign.center),
+          TextButton(onPressed: state.refresh, child: const Text('ลองใหม่')),
+        ],
+      );
+    }
+    if (items.isEmpty) {
+      return ListView(
+        children: const [
+          SizedBox(height: 80),
+          Center(child: Text('ไม่พบอุปกรณ์ที่ค้นหา')),
+        ],
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.82,
+      ),
+      itemCount: items.length,
+      itemBuilder: (_, i) => _EquipmentCard(item: items[i]),
     );
   }
 

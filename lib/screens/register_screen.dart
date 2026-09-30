@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// หน้าสมัครสมาชิก (ฟอร์มคล้ายหน้า Login)
+import '../data/api_service.dart';
+import '../data/app_state.dart';
+
+/// หน้าสมัครสมาชิก — เฟส 2: บันทึกผู้ใช้ใหม่ลงฐานข้อมูลผ่าน API
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -10,12 +13,43 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _idCtrl = TextEditingController();
+  final _userCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _obscure = true;
+  bool _busy = false;
 
-  void _submit() {
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _idCtrl.dispose();
+    _userCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await AppState.instance.register(
+        username: _userCtrl.text,
+        password: _passCtrl.text,
+        name: _nameCtrl.text,
+        studentId: _idCtrl.text,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('สมัครสมาชิกสำเร็จ (จำลอง) — กรุณาเข้าสู่ระบบ')),
+      const SnackBar(content: Text('สมัครสมาชิกสำเร็จ — กรุณาเข้าสู่ระบบ')),
     );
     Navigator.of(context).pop();
   }
@@ -23,7 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('สมัครสมาชิก  ')),
+      appBar: AppBar(title: const Text('สมัครสมาชิก')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -32,6 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
+                controller: _nameCtrl,
                 decoration: const InputDecoration(
                   labelText: 'ชื่อ-นามสกุล',
                   prefixIcon: Icon(Icons.badge_outlined),
@@ -41,6 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 14),
               TextFormField(
+                controller: _idCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'รหัสนักศึกษา',
@@ -52,17 +88,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 14),
               TextFormField(
+                controller: _userCtrl,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: 'อีเมล',
-                  prefixIcon: Icon(Icons.email_outlined),
+                  labelText: 'อีเมล/ชื่อผู้ใช้',
+                  prefixIcon: Icon(Icons.person_outline),
                 ),
-                validator: (v) => (v == null || !v.contains('@'))
-                    ? 'รูปแบบอีเมลไม่ถูกต้อง'
+                validator: (v) => (v == null || v.trim().length < 3)
+                    ? 'ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร'
                     : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
+                controller: _passCtrl,
                 obscureText: _obscure,
                 decoration: InputDecoration(
                   labelText: 'รหัสผ่าน',
@@ -80,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _submit,
+                onPressed: _busy ? null : _submit,
                 child: const Text('สมัครสมาชิก'),
               ),
               TextButton(

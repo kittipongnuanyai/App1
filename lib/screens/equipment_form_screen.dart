@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../data/api_service.dart';
 import '../data/app_state.dart';
 import '../models/equipment.dart';
 import '../theme.dart';
@@ -29,6 +30,7 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
   late EquipmentCategory _category =
       widget.existing?.category ?? EquipmentCategory.board;
   late String? _imagePath = widget.existing?.imagePath;
+  bool _saving = false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -72,34 +74,45 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final state = AppState.instance;
     final total = int.parse(_totalCtrl.text.trim());
 
-    if (_isEdit) {
-      final item = widget.existing!;
-      final borrowed = item.total - item.available;
-      item
-        ..name = _nameCtrl.text.trim()
-        ..category = _category
-        ..total = total
-        ..available = (total - borrowed).clamp(0, total)
-        ..description = _descCtrl.text.trim()
-        ..imagePath = _imagePath;
-      state.updateEquipment(item);
-    } else {
-      state.addEquipment(Equipment(
-        id: 'e${DateTime.now().millisecondsSinceEpoch}',
-        name: _nameCtrl.text.trim(),
-        category: _category,
-        total: total,
-        available: total,
-        description: _descCtrl.text.trim(),
-        imagePath: _imagePath,
-      ));
+    setState(() => _saving = true);
+    try {
+      if (_isEdit) {
+        final item = widget.existing!;
+        final borrowed = item.total - item.available;
+        item
+          ..name = _nameCtrl.text.trim()
+          ..category = _category
+          ..total = total
+          ..available = (total - borrowed).clamp(0, total)
+          ..description = _descCtrl.text.trim()
+          ..imagePath = _imagePath;
+        await state.updateEquipment(item); // เซิร์ฟเวอร์คำนวณ available เองอีกครั้ง
+      } else {
+        await state.addEquipment(Equipment(
+          id: '0', // เซิร์ฟเวอร์เป็นคนกำหนด id จริง
+          name: _nameCtrl.text.trim(),
+          category: _category,
+          total: total,
+          available: total,
+          description: _descCtrl.text.trim(),
+          imagePath: _imagePath,
+        ));
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(_isEdit ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มอุปกรณ์แล้ว')),
     );
@@ -203,7 +216,7 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
               const SizedBox(height: 28),
               // ---------- ส่วนล่าง: บันทึก ----------
               ElevatedButton.icon(
-                onPressed: _save,
+                onPressed: _saving ? null : _save,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('บันทึก'),
               ),

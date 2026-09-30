@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/api_service.dart';
 import '../data/app_state.dart';
 import '../models/borrow.dart';
 import '../theme.dart';
@@ -63,10 +64,13 @@ class _BorrowList extends StatelessWidget {
         ),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: borrows.length,
-      itemBuilder: (_, i) => _BorrowCard(borrow: borrows[i]),
+    return RefreshIndicator(
+      onRefresh: AppState.instance.refresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: borrows.length,
+        itemBuilder: (_, i) => _BorrowCard(borrow: borrows[i]),
+      ),
     );
   }
 }
@@ -94,7 +98,15 @@ class _BorrowCard extends StatelessWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
-    AppState.instance.returnItem(borrow);
+    try {
+      await AppState.instance.returnItem(borrow);
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    }
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('คืน ${borrow.equipmentName} สำเร็จ')),
     );
