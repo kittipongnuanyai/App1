@@ -29,4 +29,17 @@ class Borrow {
 
   bool get isOverdue => !isReturned && daysLeft < 0;
   bool get isDueSoon => !isReturned && daysLeft >= 0 && daysLeft <= 3;
+
+  /// แปลงจาก JSON ที่ API ส่งมา (ตาราง borrows JOIN items)
+  factory Borrow.fromJson(Map<String, dynamic> json) => Borrow(
+        id: '${json['id']}',
+        equipmentId: '${json['item_id']}',
+        equipmentName: json['item_name'] as String,
+        quantity: json['quantity'] as int,
+        borrowDate: DateTime.parse(json['borrow_date'] as String),
+        dueDate: DateTime.parse(json['due_date'] as String),
+        returnDate: json['return_date'] == null
+            ? null
+            : DateTime.parse(json['return_date'] as String),
+      );
 }
