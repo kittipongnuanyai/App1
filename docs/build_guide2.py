@@ -3,6 +3,7 @@
 import base64
 import html
 import subprocess
+import sys
 from datetime import date
 from io import BytesIO
 from pathlib import Path
@@ -14,9 +15,14 @@ from pygments.lexers import (BashLexer, DartLexer, DiffLexer, JsonLexer,
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
-OUT_HTML = DOCS / "LabStock-คู่มือเฟส2-MySQL.html"
-OUT_PDF_RAW = DOCS / "_raw2.pdf"
-OUT_PDF = DOCS / "LabStock-คู่มือเฟส2-MySQL.pdf"
+# python3 build_guide2.py            → ฉบับผู้สอน (มีแผนการสอนและกล่อง "สำหรับผู้สอน")
+# python3 build_guide2.py student    → ฉบับนักศึกษา (ตัดส่วนผู้สอนออก เพิ่ม "ก่อนเริ่ม" และ "สิ่งที่ต้องส่ง")
+EDITION = sys.argv[1] if len(sys.argv) > 1 else "teacher"
+STUDENT = EDITION == "student"
+SUFFIX = "-ฉบับนักศึกษา" if STUDENT else ""
+OUT_HTML = DOCS / f"LabStock-คู่มือเฟส2-MySQL{SUFFIX}.html"
+OUT_PDF_RAW = DOCS / f"_raw2{EDITION}.pdf"
+OUT_PDF = DOCS / f"LabStock-คู่มือเฟส2-MySQL{SUFFIX}.pdf"
 REPO = "https://github.com/kittipongnuanyai/App1"
 BASE_TAG = "phase1-ui"
 
@@ -63,6 +69,8 @@ def diff_block(rel: str) -> str:
 
 
 def box(kind: str, title: str, body: str) -> str:
+    if STUDENT and kind == "teacher":
+        return ""
     return f'<div class="box {kind}"><div class="boxtitle">{title}</div>{body}</div>'
 
 
@@ -101,13 +109,15 @@ step(12, "ตั้งต้นที่จุดเดียวกัน: ด�
      p("คนที่ทำเฟส 1 ไม่ทัน หรือโค้ดมีปัญหา ให้ใช้โค้ดจาก GitHub แทนของตัวเองได้เลย รีโปมี <b>tag</b> ชื่อ "
        + c("phase1-ui") + " คือจุดจบของเฟส 1 พอดี")
      + "<h3>วิธีที่ 1: ดาวน์โหลด ZIP (ไม่ต้องใช้ git)</h3>"
-     + ol(f"เปิด <b>{REPO}/releases/tag/phase1-ui</b> หรือกดปุ่ม Code → Download ZIP",
-          "แตกไฟล์ เปลี่ยนชื่อโฟลเดอร์เป็น " + c("labstock"),
+     + ol(f"ดาวน์โหลด <b>{REPO}/archive/refs/tags/phase1-ui.zip</b>",
+          "แตกไฟล์ จะได้โฟลเดอร์ App1-phase1-ui ให้เปลี่ยนชื่อเป็น " + c("labstock"),
           "เปิดโฟลเดอร์ใน VS Code แล้วรัน " + c("flutter pub get") + " และ " + c("flutter run"))
      + "<h3>วิธีที่ 2: ใช้ git (แนะนำ จะได้ดึงโค้ดขั้นถัดไปได้ง่าย)</h3>"
      + code(f"git clone {REPO}.git labstock\ncd labstock\ngit checkout phase1-ui      # ไปยังจุดจบเฟส 1\nflutter pub get\nflutter run", "bash")
      + p("ระหว่างทำเฟส 2 ถ้าอยากดูโค้ดของขั้นไหน ให้เปิดหน้า <b>compare</b> บน GitHub จะเห็นว่าแต่ละไฟล์ต้องแก้บรรทัดไหน (สีเขียว = เพิ่ม, สีแดง = ลบ):")
      + code(f"{REPO}/compare/phase1-ui...phase2-mysql", "bash")
+     + box("warn", "ถ้า pub get ขึ้นว่า requires SDK version ^3.9.2",
+           p("แปลว่า Flutter ในเครื่องเก่ากว่าที่โปรเจกต์ใช้ ให้รัน " + c("flutter upgrade") + " (ใช้เน็ต 5–10 นาที) แล้วตรวจด้วย " + c("flutter --version") + " ต้องได้ 3.35 ขึ้นไป ถ้ายังเก่าอยู่ให้ " + c("flutter channel stable && flutter upgrade") + " อย่าแก้เลขเวอร์ชันใน pubspec.yaml เพราะโค้ดจะไปพังที่อื่นแทน"))
      + "<h3>เปิด XAMPP</h3>"
      + ol("เปิด XAMPP Control Panel → Start <b>Apache</b> และ <b>MySQL</b> (ทั้งสองต้องเป็นสีเขียว)",
           "เปิดเบราว์เซอร์ไปที่ " + c("http://localhost/phpmyadmin") + " ต้องเห็นหน้า phpMyAdmin",
@@ -287,7 +297,7 @@ step(16, "เปลี่ยน AppState ไปใช้ API และปรั�
 # ================================================================ STEP 17
 step(17, "นำขึ้นโฮสต์จริง และก้าวต่อไป", 40,
      "เข้าใจข้อจำกัดของโฮสต์ฟรี นำ API ขึ้นโฮสต์ที่รองรับแอปมือถือได้ และเห็นภาพเฟส 3",
-     box("teacher", "คำเตือนสำคัญเรื่อง InfinityFree",
+     box("warn", "คำเตือนสำคัญเรื่อง InfinityFree",
          p("InfinityFree (และโฮสต์ฟรีในเครือ iFastNet เช่น Byet, ProFreeHost) มี <b>ระบบตรวจสอบเบราว์เซอร์</b> ที่ต้องรัน JavaScript (aes.js) และเก็บคุกกี้ก่อนจึงจะเข้าถึงไฟล์ PHP ได้ "
            "แอป Flutter ไม่ใช่เบราว์เซอร์ จึงได้รับหน้า HTML แทน JSON ทุกครั้ง เอกสารของ InfinityFree ระบุตรง ๆ ว่า "
            "<i>\"Android or iOS mobile apps cannot connect to your website\"</i> และ <i>\"REST APIs ... are blocked\"</i> "
@@ -366,43 +376,14 @@ H.append(f"""
   </div>
   <div class="accent"></div>
   <div class="info">
-    <b>ต่อจากเฟส 1 (Step 0–11)</b> · Step 12–17 · ประมาณ 5 คาบ<br>
+    <b>{"ฉบับนักศึกษา · " if STUDENT else ""}ต่อจากเฟส 1 (Step 0–11)</b> · Step 12–17 · ประมาณ 5 คาบ<br>
     เปลี่ยนข้อมูลจำลองในหน่วยความจำให้เป็นฐานข้อมูลจริง โดยหน้าจอแทบไม่ต้องแก้<br>
     <span class="small">Flutter 3.35 · PHP 8 · MySQL/MariaDB (XAMPP) · โค้ดทั้งหมดที่ {REPO} · ปรับปรุง {TODAY_TH}</span>
   </div>
 </div>
 """)
 
-# ---- teacher section
-H.append('<div class="step"><h2>สำหรับผู้สอน: เตรียมอะไร และสอนอย่างไร</h2>')
-H.append("<h3>สิ่งที่ต้องเตรียมก่อนคาบแรกของเฟส 2</h3>")
-H.append(ol(
-    f"push โค้ดขึ้น GitHub พร้อม tag <b>phase1-ui</b> และ <b>phase2-mysql</b> แล้วทดสอบเปิด {REPO}/compare/phase1-ui...phase2-mysql ว่าเห็น diff",
-    "ทุกเครื่องในห้องมี XAMPP และสตาร์ต Apache + MySQL ได้ (ทดสอบก่อนคาบ 1 วัน เพราะปัญหาพอร์ตชนแก้นาน)",
-    "เครื่องผู้สอน: import labstock.sql และวาง api ไว้แล้ว เปิด index.php ได้ทันทีตอนสาธิต",
-    "เตรียม IP ของเครื่องผู้สอนไว้ ให้นักศึกษาที่ XAMPP มีปัญหาชี้แอปมาที่เซิร์ฟเวอร์ของผู้สอนชั่วคราว (ทุกคนอยู่วง Wi-Fi เดียวกัน) จะได้ไม่หยุดเรียน",
-    "ติดตั้ง Thunder Client (VS Code) หรือใช้ curl เพื่อสาธิต POST/PUT",
-    "แจ้งล่วงหน้าว่า<b>ไม่ใช้ InfinityFree</b> (ดูเหตุผลใน Step 17) ถ้าจะให้ส่งงานบนโฮสต์ ให้สมัคร AlwaysData ไว้ก่อน",
-))
-H.append("<h3>แผนการสอน</h3>")
-H.append(table(["Step", "หัวข้อ", "เป้าหมาย", "นาที"],
-               [[str(s["no"]), f"<b>{s['title']}</b>", s["goal"], str(s["minutes"])] for s in STEPS]
-               + [["", "<b>รวม</b>", "", f"<b>{sum(s['minutes'] for s in STEPS)}</b>"]]))
-H.append("<h3>ลำดับการสอนที่แนะนำในแต่ละ Step</h3>")
-H.append(ol("<b>เห็นก่อน (5 นาที)</b> ผู้สอนสาธิตผลลัพธ์ปลายทางของ Step นั้น เช่น curl แล้วเห็นแถวเพิ่มใน phpMyAdmin",
-            "<b>เข้าใจ (10–15 นาที)</b> อธิบายกล่อง \"ความรู้ใหม่\" ด้วยโค้ดจริงบนจอ ไม่ต้องอธิบายทุกบรรทัด เน้นบรรทัดที่เป็นแนวคิด",
-            "<b>ทำเอง (ส่วนใหญ่ของเวลา)</b> นักศึกษาคัดลอกไฟล์ใหม่จาก GitHub และแก้ไฟล์เดิมตาม diff — ห้ามพิมพ์ตามทั้งไฟล์ เสียเวลาและผิดง่าย",
-            "<b>Checkpoint (5 นาที)</b> เดินดูทีละโต๊ะตามรายการในกล่องเขียว ใครผ่านให้ทำท้าทาย ใครไม่ผ่านให้จับคู่กับคนที่ผ่าน",
-            "<b>จุดที่ต้องรอทั้งห้อง</b>: จบ Step 14 (API ต้องได้ทุกคน) และจบ Step 16 รอบแรก (login + list) ก่อนไปต่อ"))
-H.append("<h3>วิธีให้นักศึกษา \"โหลดโค้ดเป็นส่วน ๆ\"</h3>")
-H.append(p("โค้ดใน GitHub แยก commit ตาม Step (Step 13, 14, 15, 16) นักศึกษาเลือกได้ 3 ระดับตามความพร้อม:"))
-H.append(table(["ระดับ", "วิธี", "เหมาะกับ"], [
-    ["A ทำเอง", "อ่าน diff ในคู่มือ แล้วแก้โค้ดตัวเองทีละบรรทัด", "คนที่เฟส 1 ทำเองสำเร็จ"],
-    ["B คัดลอกทีละไฟล์", f"เปิดไฟล์บน GitHub → ปุ่ม Raw → คัดลอกทั้งไฟล์ทับของเดิม (เฉพาะไฟล์ที่ Step นั้นบอก)", "คนที่ตามทันแต่พิมพ์ช้า"],
-    ["C ข้ามไปจุดจบของ Step", c("git checkout <commit ของ Step>") + " หรือดาวน์โหลด ZIP ของ tag phase2-mysql แล้วแก้ค่า kApiBase / config.php อย่างเดียว", "คนที่ตามไม่ทัน ให้ไปต่อพร้อมเพื่อนก่อน แล้วค่อยย้อนอ่าน"],
-]))
-H.append("<h3>ปัญหาที่พบบ่อยและวิธีแก้</h3>")
-H.append(table(["อาการ", "สาเหตุ", "แก้"], [
+TROUBLE = table(["อาการ", "สาเหตุ", "แก้"], [
     ["แอปขึ้น \"เชื่อมต่อเซิร์ฟเวอร์ไม่ได้\" บน Android Emulator", "ใช้ localhost ซึ่งหมายถึงตัว emulator เอง", "ใช้ 10.0.2.2 (api_config.dart ทำให้อัตโนมัติ ตรวจว่า kApiBase ยังเป็น localhost)"],
     ["มือถือจริงต่อไม่ได้ แต่ emulator ได้", "Firewall ของ Windows บล็อก Apache หรือมือถือคนละ Wi-Fi", "อนุญาต Apache ใน Firewall · เช็ก IP ด้วยเบราว์เซอร์มือถือก่อน"],
     ["Android ขึ้น CLEARTEXT communication not permitted", "Android 9+ ห้าม http", "เพิ่ม usesCleartextTraffic=\"true\" ใน AndroidManifest (Step 15)"],
@@ -412,8 +393,70 @@ H.append(table(["อาการ", "สาเหตุ", "แก้"], [
     ["MySQL ใน XAMPP สตาร์ตไม่ขึ้น", "พอร์ต 3306 ถูกใช้แล้ว", "ปิด MySQL service ตัวอื่น หรือเปลี่ยนพอร์ตและแก้ DB_PORT"],
     ["login ได้แต่รายการว่าง", "items.php error หรือ category ในตารางไม่ตรง enum", "เปิด items.php ในเบราว์เซอร์ · category ต้องเป็น board/sensor/cable/module/tool"],
     ["ยืมแล้วจำนวนไม่ลด", "ลืม await refresh() หรือ PUT/POST ไปไม่ถึง", "ดู log Apache หรือ print ใน _send"],
-]))
-H.append("</div>")
+])
+
+# ---- intro section (ต่างกันตามฉบับ)
+if STUDENT:
+    H.append('<div class="step"><h2>ก่อนเริ่ม: อ่านหน้านี้ก่อน</h2>')
+    H.append(p("ในเฟส 1 แอป LabStock ใช้ข้อมูลจำลองที่อยู่ในหน่วยความจำ ปิดแอปแล้วหาย คนอื่นก็ไม่เห็น ในเฟส 2 เราจะย้ายข้อมูลไปไว้ใน <b>MySQL</b> จริง โดยให้ <b>PHP</b> เป็นตัวกลางรับคำขอจากแอป (REST API) แอปจึงใช้ได้หลายเครื่องพร้อมกันเหมือนแอปจริง"))
+    H.append("<h3>สิ่งที่ต้องมีในเครื่อง</h3>")
+    H.append(ul("Flutter <b>3.35 ขึ้นไป</b> (ตรวจด้วย " + c("flutter --version") + " ถ้าเก่ากว่าให้ " + c("flutter upgrade") + ")",
+                "XAMPP (Apache + MySQL + phpMyAdmin) ตัวเดียวกับที่ใช้ตอนเรียนวิชาฐานข้อมูล",
+                "VS Code หรือ Android Studio และ Git",
+                "Emulator/Simulator หรือมือถือจริงที่ต่อ Wi-Fi วงเดียวกับคอม"))
+    H.append("<h3>เอาโค้ดมาจากไหน</h3>")
+    H.append(table(["ต้องการ", "ลิงก์ / คำสั่ง"], [
+        ["โค้ดจุดเริ่มต้น (จบเฟส 1) แบบ ZIP", f"{REPO}/archive/refs/tags/phase1-ui.zip"],
+        ["clone ด้วย git หรือ Android Studio (Get from VCS)", c(f"{REPO}.git") + " แล้ว " + c("git checkout phase1-ui")],
+        ["ดูว่าแต่ละไฟล์ต้องแก้บรรทัดไหน", f"{REPO}/compare/phase1-ui...phase2-mysql"],
+        ["ไฟล์ SQL และ PHP", f"{REPO}/tree/phase2-mysql/server"],
+        ["โค้ดจบเฟส 2 (ใช้เทียบเมื่อติด)", f"{REPO}/archive/refs/tags/phase2-mysql.zip"],
+    ]))
+    H.append("<h3>วิธีอ่านคู่มือนี้</h3>")
+    H.append(ul("แต่ละ Step มี <b>เป้าหมาย</b> → กล่องฟ้า <b>ความรู้ใหม่</b> (อ่านให้เข้าใจก่อนลงมือ) → <b>โค้ด</b> → กล่องเขียว <b>Checkpoint</b> (ต้องผ่านทุกข้อก่อนไป Step ถัดไป) → กล่องเหลือง <b>ท้าทาย</b> (ทำเมื่อเสร็จก่อนเพื่อน)",
+                "กล่องโค้ดที่หัวเขียนว่า <b>ไฟล์ใหม่ · คัดลอกทั้งไฟล์</b>: สร้างไฟล์ตาม path ที่หัวกล่อง แล้วคัดลอกจาก GitHub (เปิดไฟล์ → ปุ่ม Raw → เลือกทั้งหมด) ไม่ต้องพิมพ์เอง",
+                "กล่องโค้ดที่หัวเขียนว่า <b>ไฟล์เดิม · แก้ +N / −M บรรทัด</b>: เปิดไฟล์เดิมของตัวเอง แล้วแก้เฉพาะบรรทัด <span style='background:#dcf5dc'>สีเขียว (+) คือเพิ่ม</span> และ <span style='background:#fde0e0'>สีแดง (−) คือลบ</span> บรรทัดสีขาวคือบริบทให้หาตำแหน่ง",
+                "ทำไม่ทันหรือพังจนแก้ไม่ไหว: ดาวน์โหลดโค้ดจบเฟส 2 มาแทน แล้วแก้แค่ " + c("kApiBase") + " ใน api_config.dart กับ " + c("config.php") + " จากนั้นค่อยย้อนกลับมาอ่านว่าแต่ละ Step ทำอะไร"))
+    H.append("<h3>ลำดับที่จะทำ</h3>")
+    H.append(table(["Step", "หัวข้อ", "ทำเสร็จแล้วจะได้อะไร", "นาที"],
+                   [[str(s_["no"]), f"<b>{s_['title']}</b>", s_["goal"], str(s_["minutes"])] for s_ in STEPS]))
+    H.append(box("challenge", "สิ่งที่ต้องส่งเมื่อจบเฟส 2",
+                 ol("ภาพหน้าจอแอปหลัง login ด้วยบัญชีที่<b>สมัครเอง</b>ผ่านหน้าสมัครสมาชิก และหน้ารายการที่มีอุปกรณ์ที่ตัวเองเพิ่ม (login เป็น admin เพิ่ม)",
+                    "ภาพ phpMyAdmin ตาราง borrows ที่มีแถวการยืมของบัญชีตัวเอง และหลังกดคืน return_date มีค่า",
+                    "ภาพผล " + c("flutter test") + " ที่ขึ้น All tests passed!",
+                    "ลิงก์รีโป GitHub ของตัวเอง หรือไฟล์ ZIP โค้ด (ไม่ต้องส่งโฟลเดอร์ build)")))
+    H.append("</div>")
+else:
+  H.append('<div class="step"><h2>สำหรับผู้สอน: เตรียมอะไร และสอนอย่างไร</h2>')
+  H.append("<h3>สิ่งที่ต้องเตรียมก่อนคาบแรกของเฟส 2</h3>")
+  H.append(ol(
+      f"push โค้ดขึ้น GitHub พร้อม tag <b>phase1-ui</b> และ <b>phase2-mysql</b> แล้วทดสอบเปิด {REPO}/compare/phase1-ui...phase2-mysql ว่าเห็น diff",
+      "ทุกเครื่องในห้องมี XAMPP และสตาร์ต Apache + MySQL ได้ (ทดสอบก่อนคาบ 1 วัน เพราะปัญหาพอร์ตชนแก้นาน)",
+      "เครื่องผู้สอน: import labstock.sql และวาง api ไว้แล้ว เปิด index.php ได้ทันทีตอนสาธิต",
+      "เตรียม IP ของเครื่องผู้สอนไว้ ให้นักศึกษาที่ XAMPP มีปัญหาชี้แอปมาที่เซิร์ฟเวอร์ของผู้สอนชั่วคราว (ทุกคนอยู่วง Wi-Fi เดียวกัน) จะได้ไม่หยุดเรียน",
+      "ติดตั้ง Thunder Client (VS Code) หรือใช้ curl เพื่อสาธิต POST/PUT",
+      "แจ้งล่วงหน้าว่า<b>ไม่ใช้ InfinityFree</b> (ดูเหตุผลใน Step 17) ถ้าจะให้ส่งงานบนโฮสต์ ให้สมัคร AlwaysData ไว้ก่อน",
+  ))
+  H.append("<h3>แผนการสอน</h3>")
+  H.append(table(["Step", "หัวข้อ", "เป้าหมาย", "นาที"],
+                 [[str(s["no"]), f"<b>{s['title']}</b>", s["goal"], str(s["minutes"])] for s in STEPS]
+                 + [["", "<b>รวม</b>", "", f"<b>{sum(s['minutes'] for s in STEPS)}</b>"]]))
+  H.append("<h3>ลำดับการสอนที่แนะนำในแต่ละ Step</h3>")
+  H.append(ol("<b>เห็นก่อน (5 นาที)</b> ผู้สอนสาธิตผลลัพธ์ปลายทางของ Step นั้น เช่น curl แล้วเห็นแถวเพิ่มใน phpMyAdmin",
+              "<b>เข้าใจ (10–15 นาที)</b> อธิบายกล่อง \"ความรู้ใหม่\" ด้วยโค้ดจริงบนจอ ไม่ต้องอธิบายทุกบรรทัด เน้นบรรทัดที่เป็นแนวคิด",
+              "<b>ทำเอง (ส่วนใหญ่ของเวลา)</b> นักศึกษาคัดลอกไฟล์ใหม่จาก GitHub และแก้ไฟล์เดิมตาม diff — ห้ามพิมพ์ตามทั้งไฟล์ เสียเวลาและผิดง่าย",
+              "<b>Checkpoint (5 นาที)</b> เดินดูทีละโต๊ะตามรายการในกล่องเขียว ใครผ่านให้ทำท้าทาย ใครไม่ผ่านให้จับคู่กับคนที่ผ่าน",
+              "<b>จุดที่ต้องรอทั้งห้อง</b>: จบ Step 14 (API ต้องได้ทุกคน) และจบ Step 16 รอบแรก (login + list) ก่อนไปต่อ"))
+  H.append("<h3>วิธีให้นักศึกษา \"โหลดโค้ดเป็นส่วน ๆ\"</h3>")
+  H.append(p("โค้ดใน GitHub แยก commit ตาม Step (Step 13, 14, 15, 16) นักศึกษาเลือกได้ 3 ระดับตามความพร้อม:"))
+  H.append(table(["ระดับ", "วิธี", "เหมาะกับ"], [
+      ["A ทำเอง", "อ่าน diff ในคู่มือ แล้วแก้โค้ดตัวเองทีละบรรทัด", "คนที่เฟส 1 ทำเองสำเร็จ"],
+      ["B คัดลอกทีละไฟล์", f"เปิดไฟล์บน GitHub → ปุ่ม Raw → คัดลอกทั้งไฟล์ทับของเดิม (เฉพาะไฟล์ที่ Step นั้นบอก)", "คนที่ตามทันแต่พิมพ์ช้า"],
+      ["C ข้ามไปจุดจบของ Step", c("git checkout <commit ของ Step>") + " หรือดาวน์โหลด ZIP ของ tag phase2-mysql แล้วแก้ค่า kApiBase / config.php อย่างเดียว", "คนที่ตามไม่ทัน ให้ไปต่อพร้อมเพื่อนก่อน แล้วค่อยย้อนอ่าน"],
+  ]))
+  H.append("<h3>ปัญหาที่พบบ่อยและวิธีแก้</h3>")
+  H.append(TROUBLE)
+  H.append("</div>")
 
 for s in STEPS:
     H.append(f"""<div class="step">
@@ -423,6 +466,11 @@ for s in STEPS:
 {s['body']}
 </div>""")
 
+if STUDENT:
+    H.append('<div class="step"><h2>ภาคผนวก: แก้ปัญหาด้วยตัวเอง</h2>')
+    H.append(p("ก่อนยกมือถาม ลองไล่ตามตารางนี้ก่อน ส่วนใหญ่แก้ได้ใน 2 นาที"))
+    H.append(TROUBLE)
+    H.append("</div>")
 H.append("</body></html>")
 OUT_HTML.write_text("".join(H), encoding="utf-8")
 print("HTML:", OUT_HTML)
